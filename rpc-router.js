@@ -14,16 +14,16 @@ function traverse(name, object) {
     var descriptor;
 
     if (objectType === "object" && Array.isArray(object)) {
-        descriptor = [];
+        descriptor = {type: "array", value: []};
         Object.keys(object).forEach(function(key) {
             var subDescriptor = traverse(key, object[key]);
-            descriptor[key] = subDescriptor;
+            descriptor.value[key] = subDescriptor;
         });
     } else if (objectType === "object") {
-        descriptor = {};
+        descriptor = {type: "object", value: {}};
         Object.keys(object).forEach(function(key) {
             var subDescriptor = traverse(key, object[key]);
-            descriptor[key] = subDescriptor;
+            descriptor.value[key] = subDescriptor;
         });
     } else {
         descriptor = {
@@ -39,16 +39,18 @@ function traverse(name, object) {
 }
 
 function ExtensionRpcServer(id, object) {
-    this.id = id;
-    this.object = object;
+    var that = this;
+    that.id = id;
+    that.object = object;
 
-    this.descriptor = traverse("", object);
+    that.descriptor = traverse("", object);
 
     chrome.runtime.onMessage.addListener(
         function(request, sender, sendResponse) {
-            if (request.name && request.name === id) {
+            console.log("Got message: ", request);
+            if (request.name && request.name === that.id) {
                 if (request.type === "init") {
-                    sendResponse(this.descriptor);
+                    sendResponse(that.descriptor);
                 } else {
                     console.log("Ignoring message of type ", request.type);
                 }
@@ -61,10 +63,16 @@ function ExtensionRpcServer(id, object) {
 }
 
 function ExtensionRpcClient(id) {
-    this.id = id;
 
-    chrome.runtime.sendMessage({name: id, type: "init"}, function(response) {
-        console.log("Response: ", response);
+    var that = this;
+    that.id = id;
+
+    chrome.runtime.sendMessage({name: that.id, type: "init"}, function(response) {
+        console.log("Got response ", response);
+        that.descriptor = response.value;
+        Object.keys(that.descriptor).forEach(function(key) {
+            console.log(key + " is of type " + that.descriptor[key].type);
+        });
     });
 
 }
